@@ -50,7 +50,8 @@ public class MainActivity extends Activity implements MediaPlayer.OnPreparedList
                 if(btnBackground.isChecked()) {
                     mediaPlayer.stop();
                     mediaController.hide();
-                    startService(new Intent(MainActivity.this, MediaService.class));
+                    if(!isMyServiceRunning())
+                        startService(new Intent(MainActivity.this, MediaService.class));
                 }else{
                     stopService(new Intent(MainActivity.this, MediaService.class));
                     mediaPlayer = MediaPlayer.create(getApplicationContext(),R.raw.canto_femea_coleiro);
@@ -67,9 +68,12 @@ public class MainActivity extends Activity implements MediaPlayer.OnPreparedList
         mediaPlayer.setLooping(true);
         mediaController = new MediaController(this);
 
-
-        mediaPlayer.start();
-        mediaController.show(0);
+        if(!isMyServiceRunning()) {
+            mediaPlayer.start();
+            mediaController.show(0);
+        }else{
+            btnBackground.setChecked(true);
+        }
 
     }
 
@@ -104,8 +108,6 @@ public class MainActivity extends Activity implements MediaPlayer.OnPreparedList
     public void pause() {
         if(mediaPlayer!=null){
             mediaPlayer.pause();
-            mediaPlayer.stop();
-            finish();
         }
         super.onPause();
     }
@@ -158,16 +160,18 @@ public class MainActivity extends Activity implements MediaPlayer.OnPreparedList
     //--------------------------------------------------------------------------------
 
     public void onPrepared(MediaPlayer mediaPlayer) {
-        Log.d(TAG, "onPrepared");
-        mediaController.setMediaPlayer(this);
-        mediaController.setAnchorView(findViewById(R.id.main_audio_view));
+        if (!isMyServiceRunning()) {
+            Log.d(TAG, "onPrepared");
+            mediaController.setMediaPlayer(this);
+            mediaController.setAnchorView(findViewById(R.id.main_audio_view));
 
-        handler.post(new Runnable() {
-            public void run() {
-                mediaController.setEnabled(true);
-                mediaController.show(0);
-            }
-        });
+            handler.post(new Runnable() {
+                public void run() {
+                    mediaController.setEnabled(true);
+                    mediaController.show(0);
+                }
+            });
+        }
     }
 
     @Override
@@ -177,6 +181,9 @@ public class MainActivity extends Activity implements MediaPlayer.OnPreparedList
                 .setCancelable(false)
                 .setPositiveButton("Sim", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
+                        if (isMyServiceRunning()){
+                            stopService(new Intent(MainActivity.this, MediaService.class));
+                        }
                         MainActivity.this.finish();
                     }
                 })
@@ -188,5 +195,21 @@ public class MainActivity extends Activity implements MediaPlayer.OnPreparedList
         AlertDialog alert = builder.create();
         alert.show();
 
+    }
+
+    private boolean isMyServiceRunning() {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (MediaService.class.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected void onDestroy() {
+        int i = 0;
+        super.onDestroy();
     }
 }
